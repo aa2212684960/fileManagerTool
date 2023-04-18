@@ -1,9 +1,10 @@
-import os,time,winshell
-from PySide2.QtCore import QDir,Qt,QModelIndex,QItemSelectionModel
-from PySide2.QtWidgets import QApplication, QFileSystemModel,QTreeView,QFileDialog,QHeaderView,QMenu,QInputDialog,\
+import time,winshell
+from PySide2.QtCore import QDir,QModelIndex,QItemSelectionModel
+from PySide2.QtWidgets import QFileSystemModel,QTreeView,QFileDialog,QHeaderView,QMenu,QInputDialog,\
     QMessageBox,QShortcut,QLineEdit,QVBoxLayout,QWidget
 from PySide2.QtGui import QKeySequence
-from  ProgressDialog.ProgressDialog import *
+from ProgressDialog.ProgressDialog import *
+from Worker.Worker import *
 
 class fileManagerBase(QTreeView):
     def __init__(self,parent=None):
@@ -101,7 +102,7 @@ class fileManagerBase(QTreeView):
 class fileMoveManager(fileManagerBase):
     def __init__(self,parent=None):
         super().__init__(parent);
-        self.progressDialog = ProgressDialogForFile(self.rootPath);
+
 
     def setContextMenu(self):
         self.menu = QMenu()
@@ -171,22 +172,13 @@ class fileMoveManager(fileManagerBase):
         else:
             tag = f',{tag}';
 
-        reply = QMessageBox.question(self, '警告', f'即将往所选文件夹中所有Tag文本中插入新Tag "{tag}" ,请确认！',
+        reply = QMessageBox.question(self, '警告', f'即将往所选文件夹中所有Tag文本中插入新Tag"{tag[1:]}" ,请确认！',
                                      QMessageBox.Yes | QMessageBox.No);#弹出警告框防止误操作
 
         if reply == QMessageBox.No:#若选择No则不进行任何操作
             return ;
 
-        self.progressDialog.setVisible(True);
-        for subdir, dirs, files in os.walk(self.curNodePath):  # 将路径分割成父路径,子目录数组,文件数组
-            for file in files:
-                filepath = os.path.normpath(os.path.join(subdir, file));  # 组合路径然后根据所处平台路径规则设置正反斜杠
-                if filepath.endswith('.txt'):#检测文件是否为.txt文件
-                    with open(filepath, 'a') as f:
-                        f.write(tag)
-                        self.progressDialog.setValue(self.progressDialog.value() + 1);#让进度条往前走一步
-
-        self.progressDialog.setValue(self.progressDialog.value() + 1);#结尾再走一步到100%
+        ThreadProgressDialog(AddTagWorker(self.rootPath,tag));
 
 
     def undeleteAction(self):
@@ -194,8 +186,8 @@ class fileMoveManager(fileManagerBase):
         winshell.recycle_bin().undelete(path);
 
     def updateFriendWidget(self):#
-        friend = self.parent().findChild(QLineEdit,'pathEdit');
-        friend.setText(self.curNodePath);#更新路径信息
+        self.pathEdit = self.parent().findChild(QLineEdit,'pathEdit');
+        self.pathEdit.setText(self.curNodePath);#更新路径信息
 
     def mousePressEvent(self, event):#重写此事件,在按下鼠标右键呼出右键菜单的时做出响应
         if event.button() == Qt.RightButton:
@@ -213,13 +205,6 @@ class fileMoveManager(fileManagerBase):
                 self.updateFriendWidget();#更新路径显示
         
         super().mousePressEvent(event);#调用父类的事件处理函数
-
-
-
-
-
-
-
 
 
 
